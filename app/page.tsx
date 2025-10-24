@@ -15,6 +15,7 @@ export default function ReviewPage() {
   const [pairs, setPairs] = useState<
     { raw: string; enhanced: string; reviewed: boolean }[]
   >([]);
+  const [pastReview, setPastReview] = useState<number[]>([]);
 
   // 🔹 Load dataset folders
   useEffect(() => {
@@ -62,7 +63,7 @@ export default function ReviewPage() {
           enhanced: polLines[i] ?? "",
           reviewed: reviewedIndexes.includes(i),
         }));
-
+        setPastReview(reviewedIndexes);
         setPairs(merged);
         setChunkIndex(0);
       })
@@ -73,20 +74,17 @@ export default function ReviewPage() {
     setPairs((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  // 🔹 Toggle reviewed status
-  const toggleReviewed = (idx: number) => {
-    setPairs((prev) =>
-      prev.map((p, i) =>
-        i === idx ? { ...p, reviewed: !p.reviewed } : p
-      )
-    );
-  };
-
   // 🔹 Pagination logic
   const start = chunkIndex * chunkSize;
   const end = start + chunkSize;
   const currentPairs = pairs.slice(start, end);
   const totalChunks = Math.ceil(pairs.length / chunkSize);
+
+  const toggleReviewed = (globalIdx: number) => {
+    setPairs((prev) =>
+      prev.map((p, i) => (i === globalIdx ? { ...p, reviewed: true } : p))
+    );
+  };
 
   const saveCurrentBatch = async () => {
     const reviewedIndexes = pairs
@@ -99,12 +97,12 @@ export default function ReviewPage() {
       body: JSON.stringify({
         dataset: selectedDataset,
         file: selectedFile,
-        pairs,
+        pairs: currentPairs,
         reviewed: reviewedIndexes,
       }),
     });
 
-    if (res.ok) {
+    if (res.status === 200) {
       alert("✅ Đã lưu thành công!");
     } else {
       alert("❌ Lỗi khi lưu!");
@@ -169,12 +167,11 @@ export default function ReviewPage() {
           <div className="space-y-2">
             {currentPairs.map((pair, i) => {
               const globalIdx = start + i;
+              if (pastReview.includes(globalIdx)) return null; // ẩn dòng đã review
               return (
                 <div
                   key={globalIdx}
-                  className={`grid grid-cols-2 gap-6 items-start relative rounded-lg ${
-                    pair.reviewed ? "bg-green-50" : "bg-white"
-                  }`}
+                  className="grid grid-cols-2 gap-6 items-start relative rounded-lg bg-white"
                 >
                   <textarea
                     className="border rounded px-2 py-3 w-full"
@@ -194,11 +191,9 @@ export default function ReviewPage() {
                       setPairs(updated);
                     }}
                   />
-
-                  {/* ✅ Đánh dấu reviewed */}
                   <button
                     onClick={() => toggleReviewed(globalIdx)}
-                    className={`absolute left-[-3rem] top-1/2 -translate-y-1/2 px-2 py-1 rounded text-white shadow ${
+                    className={`absolute top-1/2 -translate-y-1/2 px-2 py-1 rounded text-white shadow ${
                       pair.reviewed
                         ? "bg-green-600 hover:bg-green-700"
                         : "bg-gray-400 hover:bg-gray-500"
@@ -207,8 +202,6 @@ export default function ReviewPage() {
                   >
                     ✓
                   </button>
-
-                  {/* ❌ Xóa dòng */}
                   <button
                     onClick={() => removeLine(globalIdx)}
                     className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full bg-red-500 text-white rounded px-2 py-1 hover:bg-red-600 shadow"

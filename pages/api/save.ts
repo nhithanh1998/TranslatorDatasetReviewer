@@ -16,22 +16,28 @@ export default async function handler(
         .json({ error: "Thiếu thông tin dataset, file hoặc pairs" });
     }
 
-    const datasetDir = path.join(process.cwd(), "datasets", dataset);
+    const repoRoot = process.env.REPO_ROOT!;
+    const outputDir = path.join(repoRoot, "out", dataset);
+    const outputFile = path.join(outputDir, "sample_1.jsonl");
 
-    // 🔹 Ghi lại file raw
-    const rawPath = path.join(datasetDir, "raw", file);
-    const enhancedPath = path.join(datasetDir, "polished", file);
+    // ✅ Tạo thư mục nếu chưa có
+    await fs.mkdir(outputDir, { recursive: true });
+    const reviewedDir = path.join(repoRoot, "tracking-process", dataset);
 
-    const rawText = pairs.map((p: any) => p.raw.trim()).join("\n");
-    const enhancedText = pairs.map((p: any) => p.enhanced.trim()).join("\n");
+    // ✅ Ghi dữ liệu dạng JSON Lines
+    const jsonlContent = pairs
+      .map((item: any) => JSON.stringify(item))
+      .join("\n");
 
-    await fs.mkdir(path.dirname(rawPath), { recursive: true });
-    await fs.mkdir(path.dirname(enhancedPath), { recursive: true });
+    await fs.writeFile(outputFile, jsonlContent, "utf-8");
 
-    await fs.writeFile(rawPath, rawText, "utf-8");
-    await fs.writeFile(enhancedPath, enhancedText, "utf-8");
+    const reviewedFile = path.join(reviewedDir, `${file}`);
+    await fs.mkdir(reviewedDir, { recursive: true });
 
-    return res.json({ success: true });
+    // Append reviewed mới
+    await fs.writeFile(reviewedFile, JSON.stringify(reviewed, null), "utf-8");
+
+    return res.status(200).send("Save success!");
   } catch (err: any) {
     console.error("❌ Lỗi khi lưu file:", err);
     return res

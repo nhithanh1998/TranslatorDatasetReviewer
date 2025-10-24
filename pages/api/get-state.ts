@@ -11,9 +11,9 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
 
   const statePath = path.join(
     process.cwd(),
-    "datasets",
+    "tracking-process",
     dataset.toString(),
-    "reviewed_state.json"
+    file.toString()
   );
 
   try {
@@ -24,9 +24,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const data = fs.readFileSync(statePath, "utf8");
     const parsed = JSON.parse(data);
-
-    // Nếu file đã có review -> trả về danh sách dòng đã review
-    return res.status(200).json(parsed[file.toString()] || []);
+    return res.status(200).json(parsed || []);
   } catch (err) {
     console.error("Error reading state:", err);
     return res.status(500).json({ error: "Failed to read state" });
