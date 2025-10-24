@@ -10,9 +10,10 @@ export default function ReviewPage() {
   const [selectedFile, setSelectedFile] = useState("");
 
   const [pairs, setPairs] = useState<
-    { raw: string; enhanced: string; reviewed: boolean, ignored?: boolean }[]
+    { raw: string; enhanced: string; reviewed: boolean; ignored?: boolean }[]
   >([]);
   const [pastReview, setPastReview] = useState<number[]>([]);
+  const [removing, setRemoving] = useState<Set<number>>(new Set());
 
   const { datasets } = useDatasets();
   const { files } = useFiles(selectedDataset);
@@ -52,16 +53,43 @@ export default function ReviewPage() {
       .catch(console.error);
   }, [selectedDataset, selectedFile]);
 
-  const removeLine = (idx: number) => {
-    setPastReview([...pastReview, idx]);
-    setPairs((prev) =>
-      prev.map((p, i) => (i === idx ? { ...p, ignored: true } : p))
+  // 🔹 Load dataset + file khi mở trang
+  useEffect(() => {
+    const saved = localStorage.getItem("lastReview");
+    if (saved) {
+      const { dataset, file } = JSON.parse(saved);
+      setSelectedDataset(dataset);
+      setSelectedFile(file);
+    }
+  }, []);
+
+  // 🔹 Lưu dataset + file mỗi khi thay đổi
+  useEffect(() => {
+    if (!selectedDataset || !selectedFile) return;
+    localStorage.setItem(
+      "lastReview",
+      JSON.stringify({ dataset: selectedDataset, file: selectedFile })
     );
+  }, [selectedDataset, selectedFile]);
+
+  const removeLine = (idx: number) => {
+    setRemoving((prev) => new Set(prev).add(idx)); // mark dòng đang remove
+    setTimeout(() => {
+      setPastReview((prev) => [...prev, idx]);
+      setPairs((prev) =>
+        prev.map((p, i) => (i === idx ? { ...p, ignored: true } : p))
+      );
+      setRemoving((prev) => {
+        const next = new Set(prev);
+        next.delete(idx);
+        return next;
+      });
+    }, 300); // thời gian khớp với transition
   };
 
   const markReviewed = (idx: number) => {
     setPairs((prev) =>
-      prev.map((p, i) => (i === idx ? { ...p, reviewed: true } : p))
+      prev.map((p, i) => (i === idx ? { ...p, reviewed: !p.reviewed } : p))
     );
   };
 
@@ -156,29 +184,57 @@ export default function ReviewPage() {
               return (
                 <div
                   key={i}
-                  className="grid grid-cols-2 gap-6 items-start relative rounded-lg bg-white"
+                  className={`flex items-center gap-2 transition-all duration-300 ${
+                    removing.has(i)
+                      ? "opacity-0 max-h-0 p-0"
+                      : "opacity-100 max-h-40 p-2"
+                  }`}
                 >
-                  <textarea
-                    className="border rounded px-2 py-3 w-full"
-                    value={pair.raw}
-                    onChange={(e) => {
-                      const updated = [...pairs];
-                      updated[i].raw = e.target.value;
-                      setPairs(updated);
-                    }}
-                  />
-                  <textarea
-                    className="border rounded px-2 py-3 w-full"
-                    value={pair.enhanced}
-                    onChange={(e) => {
-                      const updated = [...pairs];
-                      updated[i].enhanced = e.target.value;
-                      setPairs(updated);
-                    }}
-                  />
+                  {/* Nút X */}
+                  <button
+                    onClick={() => removeLine(i)}
+                    className="bg-red-500 text-white rounded w-8 py-1 hover:bg-red-600 shadow cursor-pointer transition-colors duration-300"
+                    title="Xóa dòng này"
+                  >
+                    ✖
+                  </button>
+
+                  {/* Textareas */}
+                  <div className="flex-1 grid grid-cols-2 gap-6">
+                    <textarea
+                      className={`border rounded px-2 py-3 w-full transition-colors duration-300 ${
+                        pair.reviewed
+                          ? "bg-green-100 border-green-300"
+                          : "bg-white border-gray-300"
+                      }`}
+                      value={pair.raw}
+                      onChange={(e) => {
+                        const updated = [...pairs];
+                        updated[i].raw = e.target.value;
+                        setPairs(updated);
+                      }}
+                      disabled={pair.reviewed}
+                    />
+                    <textarea
+                      className={`border rounded px-2 py-3 w-full transition-colors duration-300 ${
+                        pair.reviewed
+                          ? "bg-green-100 border-green-300"
+                          : "bg-white border-gray-300"
+                      }`}
+                      value={pair.enhanced}
+                      onChange={(e) => {
+                        const updated = [...pairs];
+                        updated[i].enhanced = e.target.value;
+                        setPairs(updated);
+                      }}
+                      disabled={pair.reviewed}
+                    />
+                  </div>
+
+                  {/* Nút ✓ */}
                   <button
                     onClick={() => markReviewed(i)}
-                    className={`absolute top-1/2 -translate-y-1/2 px-2 py-1 rounded text-white shadow ${
+                    className={`w-8 py-1 rounded text-white shadow cursor-pointer transition-colors duration-300 ${
                       pair.reviewed
                         ? "bg-green-600 hover:bg-green-700"
                         : "bg-gray-400 hover:bg-gray-500"
@@ -186,13 +242,6 @@ export default function ReviewPage() {
                     title="Đánh dấu đã duyệt"
                   >
                     ✓
-                  </button>
-                  <button
-                    onClick={() => removeLine(i)}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full bg-red-500 text-white rounded px-2 py-1 hover:bg-red-600 shadow"
-                    title="Xóa dòng này"
-                  >
-                    ✖
                   </button>
                 </div>
               );
