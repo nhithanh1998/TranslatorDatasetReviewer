@@ -18,7 +18,7 @@ export default async function handler(
 
     const repoRoot = process.env.REPO_ROOT!;
     const outputDir = path.join(repoRoot, "out", dataset);
-    const outputFile = path.join(outputDir, "sample_1.jsonl");
+    const outputFile = path.join(outputDir, `${file}.jsonl`);
 
     // ✅ Tạo thư mục nếu chưa có
     await fs.mkdir(outputDir, { recursive: true });
