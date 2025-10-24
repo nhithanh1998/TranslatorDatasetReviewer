@@ -71,22 +71,20 @@ export default function ReviewPage() {
   }, [selectedDataset, selectedFile]);
 
   const removeLine = (idx: number) => {
-    setPairs((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  // 🔹 Pagination logic
-  const start = chunkIndex * chunkSize;
-  const end = start + chunkSize;
-  const currentPairs = pairs.slice(start, end);
-  const totalChunks = Math.ceil(pairs.length / chunkSize);
-
-  const toggleReviewed = (globalIdx: number) => {
+    setPastReview([...pastReview, idx]);
     setPairs((prev) =>
-      prev.map((p, i) => (i === globalIdx ? { ...p, reviewed: true } : p))
+      prev.map((p, i) => (i === idx ? { ...p, reviewed: true } : p))
     );
   };
 
-  const saveCurrentBatch = async () => {
+  const markReviewed = (idx: number) => {
+    setPairs((prev) =>
+      prev.map((p, i) => (i === idx ? { ...p, reviewed: true } : p))
+    );
+  };
+
+  const saveReviewed = async () => {
+    const reviewedPairs = pairs.filter((p) => p.reviewed);
     const reviewedIndexes = pairs
       .map((p, i) => (p.reviewed ? i : null))
       .filter((v) => v !== null);
@@ -97,13 +95,12 @@ export default function ReviewPage() {
       body: JSON.stringify({
         dataset: selectedDataset,
         file: selectedFile,
-        pairs: currentPairs,
-        reviewed: reviewedIndexes,
+        pairs: reviewedPairs,
+        reviewed: reviewedIndexes, // đây là array các index đã review
       }),
     });
-
     if (res.status === 200) {
-      alert("✅ Đã lưu thành công!");
+      alert("✅ Đã lưu thành công các dòng reviewed!");
     } else {
       alert("❌ Lỗi khi lưu!");
     }
@@ -156,6 +153,13 @@ export default function ReviewPage() {
         />
       </div>
 
+      <button
+        onClick={saveReviewed}
+        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+      >
+        Lưu
+      </button>
+
       {/* Review Section */}
       {selectedFile && (
         <div>
@@ -165,12 +169,11 @@ export default function ReviewPage() {
           </div>
 
           <div className="space-y-2">
-            {currentPairs.map((pair, i) => {
-              const globalIdx = start + i;
-              if (pastReview.includes(globalIdx)) return null; // ẩn dòng đã review
+            {pairs.map((pair, i) => {
+              if (pastReview.includes(i)) return null; // ẩn dòng đã review
               return (
                 <div
-                  key={globalIdx}
+                  key={i}
                   className="grid grid-cols-2 gap-6 items-start relative rounded-lg bg-white"
                 >
                   <textarea
@@ -178,7 +181,7 @@ export default function ReviewPage() {
                     value={pair.raw}
                     onChange={(e) => {
                       const updated = [...pairs];
-                      updated[globalIdx].raw = e.target.value;
+                      updated[i].raw = e.target.value;
                       setPairs(updated);
                     }}
                   />
@@ -187,12 +190,12 @@ export default function ReviewPage() {
                     value={pair.enhanced}
                     onChange={(e) => {
                       const updated = [...pairs];
-                      updated[globalIdx].enhanced = e.target.value;
+                      updated[i].enhanced = e.target.value;
                       setPairs(updated);
                     }}
                   />
                   <button
-                    onClick={() => toggleReviewed(globalIdx)}
+                    onClick={() => markReviewed(i)}
                     className={`absolute top-1/2 -translate-y-1/2 px-2 py-1 rounded text-white shadow ${
                       pair.reviewed
                         ? "bg-green-600 hover:bg-green-700"
@@ -203,7 +206,7 @@ export default function ReviewPage() {
                     ✓
                   </button>
                   <button
-                    onClick={() => removeLine(globalIdx)}
+                    onClick={() => removeLine(i)}
                     className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full bg-red-500 text-white rounded px-2 py-1 hover:bg-red-600 shadow"
                     title="Xóa dòng này"
                   >
@@ -212,41 +215,6 @@ export default function ReviewPage() {
                 </div>
               );
             })}
-          </div>
-
-          {/* Pagination + Save */}
-          <div className="flex justify-between items-center mt-4">
-            <button
-              disabled={chunkIndex === 0}
-              onClick={() => setChunkIndex((i) => Math.max(0, i - 1))}
-              className="px-3 py-1 border rounded disabled:opacity-50"
-            >
-              ⬅ Trước
-            </button>
-
-            <div className="flex items-center gap-4">
-              <span>
-                Trang {chunkIndex + 1}/{totalChunks}
-              </span>
-              {currentPairs.length > 0 && (
-                <button
-                  onClick={saveCurrentBatch}
-                  className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-                >
-                  💾 Lưu batch này
-                </button>
-              )}
-            </div>
-
-            <button
-              disabled={chunkIndex >= totalChunks - 1}
-              onClick={() =>
-                setChunkIndex((i) => Math.min(totalChunks - 1, i + 1))
-              }
-              className="px-3 py-1 border rounded disabled:opacity-50"
-            >
-              Tiếp ➡
-            </button>
           </div>
         </div>
       )}
