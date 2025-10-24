@@ -14,7 +14,6 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     type.toString(),
     file.toString()
   );
-  console.log(filePath);
   if (!fs.existsSync(filePath))
     return res.status(404).json({ error: "File not found" });
 

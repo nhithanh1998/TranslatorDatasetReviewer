@@ -4,7 +4,6 @@ import { NextApiRequest, NextApiResponse } from "next";
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   const datasetsDir = path.join(process.cwd(), "datasets");
-  console.log(datasetsDir);
 
   if (!fs.existsSync(datasetsDir)) {
     return res.status(404).json({ error: "datasets directory not found" });

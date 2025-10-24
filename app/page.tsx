@@ -3,19 +3,24 @@
 import { useState, useEffect } from "react";
 
 export default function ReviewPage() {
-  const [datasets, setDatasets] = useState<string[]>([]);
-  const [selectedDataset, setSelectedDataset] = useState("");
-  const [files, setFiles] = useState<string[]>([]);
-  const [selectedFile, setSelectedFile] = useState("");
-  const [pairs, setPairs] = useState<{ raw: string; enhanced: string }[]>([]);
   const [chunkIndex, setChunkIndex] = useState(0);
   const [chunkSize, setChunkSize] = useState(5);
+
+  const [datasets, setDatasets] = useState<string[]>([]);
+  const [files, setFiles] = useState<string[]>([]);
+
+  const [selectedDataset, setSelectedDataset] = useState("");
+  const [selectedFile, setSelectedFile] = useState("");
+
+  const [pairs, setPairs] = useState<
+    { raw: string; enhanced: string; reviewed: boolean }[]
+  >([]);
 
   // 🔹 Load dataset folders
   useEffect(() => {
     fetch("/api/list-datasets")
       .then((res) => res.json())
-      .then((data) => setDatasets(data))
+      .then(setDatasets)
       .catch(console.error);
   }, []);
 
@@ -24,10 +29,11 @@ export default function ReviewPage() {
     if (!selectedDataset) return;
     fetch(`/api/list-files?dataset=${selectedDataset}`)
       .then((res) => res.json())
-      .then((data) => setFiles(data))
+      .then(setFiles)
       .catch(console.error);
   }, [selectedDataset]);
 
+  // 🔹 Load file content + reviewed state
   useEffect(() => {
     if (!selectedDataset || !selectedFile) return;
 
@@ -63,9 +69,17 @@ export default function ReviewPage() {
       .catch(console.error);
   }, [selectedDataset, selectedFile]);
 
-  // 🔹 Remove a line (sync both sides)
   const removeLine = (idx: number) => {
     setPairs((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  // 🔹 Toggle reviewed status
+  const toggleReviewed = (idx: number) => {
+    setPairs((prev) =>
+      prev.map((p, i) =>
+        i === idx ? { ...p, reviewed: !p.reviewed } : p
+      )
+    );
   };
 
   // 🔹 Pagination logic
@@ -74,17 +88,27 @@ export default function ReviewPage() {
   const currentPairs = pairs.slice(start, end);
   const totalChunks = Math.ceil(pairs.length / chunkSize);
 
-  // 🔹 Save only current batch
   const saveCurrentBatch = async () => {
-    await fetch("/api/save", {
+    const reviewedIndexes = pairs
+      .map((p, i) => (p.reviewed ? i : null))
+      .filter((v) => v !== null);
+
+    const res = await fetch("/api/save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         dataset: selectedDataset,
         file: selectedFile,
-        pairs, // 👈 lưu toàn bộ file hiện tại (hoặc currentPairs nếu chỉ muốn batch)
+        pairs,
+        reviewed: reviewedIndexes,
       }),
     });
+
+    if (res.ok) {
+      alert("✅ Đã lưu thành công!");
+    } else {
+      alert("❌ Lỗi khi lưu!");
+    }
   };
 
   return (
@@ -148,7 +172,9 @@ export default function ReviewPage() {
               return (
                 <div
                   key={globalIdx}
-                  className="grid grid-cols-2 gap-6 items-start relative"
+                  className={`grid grid-cols-2 gap-6 items-start relative rounded-lg ${
+                    pair.reviewed ? "bg-green-50" : "bg-white"
+                  }`}
                 >
                   <textarea
                     className="border rounded px-2 py-3 w-full"
@@ -168,6 +194,19 @@ export default function ReviewPage() {
                       setPairs(updated);
                     }}
                   />
+
+                  {/* ✅ Đánh dấu reviewed */}
+                  <button
+                    onClick={() => toggleReviewed(globalIdx)}
+                    className={`absolute left-[-3rem] top-1/2 -translate-y-1/2 px-2 py-1 rounded text-white shadow ${
+                      pair.reviewed
+                        ? "bg-green-600 hover:bg-green-700"
+                        : "bg-gray-400 hover:bg-gray-500"
+                    }`}
+                    title="Đánh dấu đã duyệt"
+                  >
+                    ✓
+                  </button>
 
                   {/* ❌ Xóa dòng */}
                   <button
