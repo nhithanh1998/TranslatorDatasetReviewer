@@ -1,38 +1,21 @@
 "use client";
 
+import { useDatasets } from "@/hooks/dataset";
+import { useFiles } from "@/hooks/files";
 import { useState, useEffect } from "react";
 
 export default function ReviewPage() {
-  const [chunkIndex, setChunkIndex] = useState(0);
   const [chunkSize, setChunkSize] = useState(5);
-
-  const [datasets, setDatasets] = useState<string[]>([]);
-  const [files, setFiles] = useState<string[]>([]);
-
-  const [selectedDataset, setSelectedDataset] = useState("");
+  const [selectedDataset, setSelectedDataset] = useState<string>();
   const [selectedFile, setSelectedFile] = useState("");
 
   const [pairs, setPairs] = useState<
-    { raw: string; enhanced: string; reviewed: boolean }[]
+    { raw: string; enhanced: string; reviewed: boolean, ignored?: boolean }[]
   >([]);
   const [pastReview, setPastReview] = useState<number[]>([]);
 
-  // 🔹 Load dataset folders
-  useEffect(() => {
-    fetch("/api/list-datasets")
-      .then((res) => res.json())
-      .then(setDatasets)
-      .catch(console.error);
-  }, []);
-
-  // 🔹 Load files in selected dataset
-  useEffect(() => {
-    if (!selectedDataset) return;
-    fetch(`/api/list-files?dataset=${selectedDataset}`)
-      .then((res) => res.json())
-      .then(setFiles)
-      .catch(console.error);
-  }, [selectedDataset]);
+  const { datasets } = useDatasets();
+  const { files } = useFiles(selectedDataset);
 
   // 🔹 Load file content + reviewed state
   useEffect(() => {
@@ -65,7 +48,6 @@ export default function ReviewPage() {
         }));
         setPastReview(reviewedIndexes);
         setPairs(merged);
-        setChunkIndex(0);
       })
       .catch(console.error);
   }, [selectedDataset, selectedFile]);
@@ -73,7 +55,7 @@ export default function ReviewPage() {
   const removeLine = (idx: number) => {
     setPastReview([...pastReview, idx]);
     setPairs((prev) =>
-      prev.map((p, i) => (i === idx ? { ...p, reviewed: true } : p))
+      prev.map((p, i) => (i === idx ? { ...p, ignored: true } : p))
     );
   };
 
@@ -86,7 +68,7 @@ export default function ReviewPage() {
   const saveReviewed = async () => {
     const reviewedPairs = pairs.filter((p) => p.reviewed);
     const reviewedIndexes = pairs
-      .map((p, i) => (p.reviewed ? i : null))
+      .map((p, i) => (p.reviewed || p.ignored ? i : null))
       .filter((v) => v !== null);
 
     const res = await fetch("/api/save", {
