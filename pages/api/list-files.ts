@@ -18,5 +18,5 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     .filter((f) => fs.existsSync(path.join(polishedDir, f)) && f.endsWith(".txt"))
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
-  return res.status(200).json({ files });
+  return res.status(200).json(files);
 }

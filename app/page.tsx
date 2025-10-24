@@ -1,193 +1,223 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 
-export default function Page() {
+export default function ReviewPage() {
   const [datasets, setDatasets] = useState<string[]>([]);
   const [selectedDataset, setSelectedDataset] = useState("");
   const [files, setFiles] = useState<string[]>([]);
-  const [currentFile, setCurrentFile] = useState("");
-  const [raw, setRaw] = useState("");
-  const [polished, setPolished] = useState("");
-  const [chunkSize, setChunkSize] = useState(5);
+  const [selectedFile, setSelectedFile] = useState("");
+  const [pairs, setPairs] = useState<{ raw: string; enhanced: string }[]>([]);
   const [chunkIndex, setChunkIndex] = useState(0);
-  const [accepted, setAccepted] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [chunkSize, setChunkSize] = useState(5);
 
-  // Load datasets
+  // 🔹 Load dataset folders
   useEffect(() => {
     fetch("/api/list-datasets")
-      .then((r) => r.json())
-      .then((d) => setDatasets(d.datasets));
+      .then((res) => res.json())
+      .then((data) => setDatasets(data))
+      .catch(console.error);
   }, []);
 
-  // Load files when dataset selected
+  // 🔹 Load files in selected dataset
   useEffect(() => {
-    if (selectedDataset) {
-      fetch(`/api/list-files?dataset=${selectedDataset}`)
-        .then((r) => r.json())
-        .then((d) => setFiles(d.files));
-    } else {
-      setFiles([]);
-      setCurrentFile("");
-    }
+    if (!selectedDataset) return;
+    fetch(`/api/list-files?dataset=${selectedDataset}`)
+      .then((res) => res.json())
+      .then((data) => setFiles(data))
+      .catch(console.error);
   }, [selectedDataset]);
 
-  // Load file content
   useEffect(() => {
-    if (!currentFile || !selectedDataset) return;
-    setLoading(true);
+    if (!selectedDataset || !selectedFile) return;
+
     Promise.all([
       fetch(
-        `/api/read-file?dataset=${selectedDataset}&file=${currentFile}&type=raw`
-      ).then((r) => r.json()),
+        `/api/read-file?dataset=${selectedDataset}&type=raw&file=${selectedFile}`
+      ).then((r) => r.text()),
       fetch(
-        `/api/read-file?dataset=${selectedDataset}&file=${currentFile}&type=polished`
+        `/api/read-file?dataset=${selectedDataset}&type=polished&file=${selectedFile}`
+      ).then((r) => r.text()),
+      fetch(
+        `/api/get-state?dataset=${selectedDataset}&file=${selectedFile}`
       ).then((r) => r.json()),
     ])
-      .then(([rawRes, polRes]) => {
-        setRaw(rawRes.text);
-        setPolished(polRes.text);
+      .then(([raw, pol, reviewedIndexes]) => {
+        const rawLines = raw
+          .split(/\r?\n/)
+          .filter((line) => line.trim() !== "");
+        const polLines = pol
+          .split(/\r?\n/)
+          .filter((line) => line.trim() !== "");
+        const max = Math.max(rawLines.length, polLines.length);
+
+        const merged = Array.from({ length: max }, (_, i) => ({
+          raw: rawLines[i] ?? "",
+          enhanced: polLines[i] ?? "",
+          reviewed: reviewedIndexes.includes(i),
+        }));
+
+        setPairs(merged);
         setChunkIndex(0);
       })
-      .finally(() => setLoading(false));
-  }, [currentFile]);
+      .catch(console.error);
+  }, [selectedDataset, selectedFile]);
 
-  // Split into chunks
-  const splitChunks = (text: string) => {
-    const lines = text.split(/\n+/).filter(Boolean);
-    const chunks: string[][] = [];
-    for (let i = 0; i < lines.length; i += chunkSize) {
-      chunks.push(lines.slice(i, i + chunkSize));
-    }
-    return chunks;
+  // 🔹 Remove a line (sync both sides)
+  const removeLine = (idx: number) => {
+    setPairs((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const rawChunks = splitChunks(raw);
-  const polishedChunks = splitChunks(polished);
+  // 🔹 Pagination logic
+  const start = chunkIndex * chunkSize;
+  const end = start + chunkSize;
+  const currentPairs = pairs.slice(start, end);
+  const totalChunks = Math.ceil(pairs.length / chunkSize);
 
-  const currentRawChunk = rawChunks[chunkIndex]?.join("\n") || "";
-  const currentPolishedChunk = polishedChunks[chunkIndex]?.join("\n") || "";
-
-  const handleAccept = () => {
-    setAccepted([
-      ...accepted,
-      { input: currentRawChunk, output: currentPolishedChunk },
-    ]);
-    setChunkIndex(chunkIndex + 1);
-  };
-
-  const handleSave = async () => {
+  // 🔹 Save only current batch
+  const saveCurrentBatch = async () => {
     await fetch("/api/save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dataset: selectedDataset, accepted }),
+      body: JSON.stringify({
+        dataset: selectedDataset,
+        file: selectedFile,
+        pairs, // 👈 lưu toàn bộ file hiện tại (hoặc currentPairs nếu chỉ muốn batch)
+      }),
     });
-    alert("💾 Đã lưu dataset reviewed!");
   };
 
   return (
-    <div className="p-6 space-y-4">
-      <h1 className="text-2xl font-bold">📘 Dataset Reviewer</h1>
+    <div className="p-6 max-w-6xl mx-auto space-y-6">
+      <h1 className="text-2xl font-bold mb-4">📝 Dataset Review Tool</h1>
 
-      {/* --- Dataset + file selection --- */}
-      <div className="flex gap-4 items-center">
+      {/* Dataset + File selection */}
+      <div className="flex gap-4">
         <select
-          className="border p-2 rounded"
+          className="border rounded p-2 flex-1"
           value={selectedDataset}
-          onChange={(e) => setSelectedDataset(e.target.value)}
+          onChange={(e) => {
+            setSelectedDataset(e.target.value);
+            setSelectedFile("");
+            setPairs([]);
+          }}
         >
-          <option value="">-- Chọn dataset --</option>
+          <option value="">-- Chọn Dataset --</option>
           {datasets.map((d) => (
-            <option key={d}>{d}</option>
+            <option key={d} value={d}>
+              {d}
+            </option>
           ))}
         </select>
 
-        {selectedDataset && (
-          <select
-            className="border p-2 rounded"
-            value={currentFile}
-            onChange={(e) => setCurrentFile(e.target.value)}
-          >
-            <option value="">-- Chọn chương --</option>
-            {files.map((f) => (
-              <option key={f}>{f}</option>
-            ))}
-          </select>
-        )}
+        <select
+          className="border rounded p-2 flex-1"
+          value={selectedFile}
+          onChange={(e) => setSelectedFile(e.target.value)}
+        >
+          <option value="">-- Chọn File --</option>
+          {files.map((f) => (
+            <option key={f} value={f}>
+              {f}
+            </option>
+          ))}
+        </select>
 
-        <label className="ml-4">Chunk size:</label>
         <input
           type="number"
-          className="w-16 border p-1 rounded"
+          className="border rounded p-2 w-24"
           min={1}
-          max={20}
+          max={50}
           value={chunkSize}
-          onChange={(e) => setChunkSize(Number(e.target.value))}
+          onChange={(e) => setChunkSize(parseInt(e.target.value) || 1)}
+          title="Số dòng mỗi lần review"
         />
       </div>
 
-      {/* --- Loading or no file selected --- */}
-      {!selectedDataset ? (
-        <p className="text-gray-500">
-          👈 Hãy chọn một dataset để bắt đầu review.
-        </p>
-      ) : !currentFile ? (
-        <p className="text-gray-500">
-          📄 Hãy chọn một chương từ dataset “{selectedDataset}”.
-        </p>
-      ) : loading ? (
-        <p className="text-gray-500">⏳ Đang tải nội dung...</p>
-      ) : (
-        <></>
+      {/* Review Section */}
+      {selectedFile && (
+        <div>
+          <div className="grid grid-cols-2 font-semibold mb-2 gap-6">
+            <div className="font-bold text-xl">Origin</div>
+            <div className="font-bold text-xl">Enhanced</div>
+          </div>
+
+          <div className="space-y-2">
+            {currentPairs.map((pair, i) => {
+              const globalIdx = start + i;
+              return (
+                <div
+                  key={globalIdx}
+                  className="grid grid-cols-2 gap-6 items-start relative"
+                >
+                  <textarea
+                    className="border rounded px-2 py-3 w-full"
+                    value={pair.raw}
+                    onChange={(e) => {
+                      const updated = [...pairs];
+                      updated[globalIdx].raw = e.target.value;
+                      setPairs(updated);
+                    }}
+                  />
+                  <textarea
+                    className="border rounded px-2 py-3 w-full"
+                    value={pair.enhanced}
+                    onChange={(e) => {
+                      const updated = [...pairs];
+                      updated[globalIdx].enhanced = e.target.value;
+                      setPairs(updated);
+                    }}
+                  />
+
+                  {/* ❌ Xóa dòng */}
+                  <button
+                    onClick={() => removeLine(globalIdx)}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full bg-red-500 text-white rounded px-2 py-1 hover:bg-red-600 shadow"
+                    title="Xóa dòng này"
+                  >
+                    ✖
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Pagination + Save */}
+          <div className="flex justify-between items-center mt-4">
+            <button
+              disabled={chunkIndex === 0}
+              onClick={() => setChunkIndex((i) => Math.max(0, i - 1))}
+              className="px-3 py-1 border rounded disabled:opacity-50"
+            >
+              ⬅ Trước
+            </button>
+
+            <div className="flex items-center gap-4">
+              <span>
+                Trang {chunkIndex + 1}/{totalChunks}
+              </span>
+              {currentPairs.length > 0 && (
+                <button
+                  onClick={saveCurrentBatch}
+                  className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                >
+                  💾 Lưu batch này
+                </button>
+              )}
+            </div>
+
+            <button
+              disabled={chunkIndex >= totalChunks - 1}
+              onClick={() =>
+                setChunkIndex((i) => Math.min(totalChunks - 1, i + 1))
+              }
+              className="px-3 py-1 border rounded disabled:opacity-50"
+            >
+              Tiếp ➡
+            </button>
+          </div>
+        </div>
       )}
-      <>
-        {/* --- Review panel --- */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <h2 className="font-semibold mb-2">📝 Origin</h2>
-            <textarea
-              value={currentRawChunk}
-              onChange={(e) => setRaw(e.target.value)}
-              className="w-full h-80 border rounded p-2"
-            />
-          </div>
-          <div>
-            <h2 className="font-semibold mb-2">✨ Enhanced</h2>
-            <textarea
-              value={currentPolishedChunk}
-              onChange={(e) => setPolished(e.target.value)}
-              className="w-full h-80 border rounded p-2"
-            />
-          </div>
-        </div>
-
-        <div className="flex gap-3">
-          <button
-            onClick={handleAccept}
-            className="bg-green-500 text-white px-4 py-2 rounded"
-          >
-            ✅ Accept
-          </button>
-          <button
-            onClick={() => setChunkIndex(chunkIndex + 1)}
-            className="bg-gray-500 text-white px-4 py-2 rounded"
-          >
-            ⏭️ Skip
-          </button>
-          <button
-            onClick={handleSave}
-            className="bg-blue-500 text-white px-4 py-2 rounded"
-          >
-            💾 Save
-          </button>
-        </div>
-
-        <p className="text-sm text-gray-600">
-          Chunk {chunkIndex + 1}/{rawChunks.length} — Đã accept:{" "}
-          {accepted.length}
-        </p>
-      </>
     </div>
   );
 }
