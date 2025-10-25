@@ -117,138 +117,141 @@ export default function ReviewPage() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold mb-4">📝 Dataset Review Tool</h1>
+    <div className="p-6 mx-auto space-y-6 bg-gray-900 text-gray-50">
+      <div className="container mx-auto">
+        <h1 className="text-2xl font-bold mb-4">📝 Dataset Review Tool</h1>
 
-      {/* Dataset + File selection */}
-      <div className="flex gap-4">
-        <select
-          className="border rounded p-2 flex-1"
-          value={selectedDataset}
-          onChange={(e) => {
-            setSelectedDataset(e.target.value);
-            setSelectedFile("");
-            setPairs([]);
-          }}
-        >
-          <option value="">-- Chọn Dataset --</option>
-          {datasets.map((d) => (
-            <option key={d} value={d}>
-              {d}
-            </option>
-          ))}
-        </select>
+        {/* Dataset + File selection */}
+        <div className="flex gap-4">
+          <select
+            className="border rounded p-2 flex-1"
+            value={selectedDataset}
+            onChange={(e) => {
+              setSelectedDataset(e.target.value);
+              setSelectedFile("");
+              setPairs([]);
+            }}
+          >
+            <option value="">-- Chọn Dataset --</option>
+            {datasets.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
 
-        <select
-          className="border rounded p-2 flex-1"
-          value={selectedFile}
-          onChange={(e) => setSelectedFile(e.target.value)}
-        >
-          <option value="">-- Chọn File --</option>
-          {files.map((f) => (
-            <option key={f} value={f}>
-              {f}
-            </option>
-          ))}
-        </select>
+          <select
+            className="border rounded p-2 flex-1"
+            value={selectedFile}
+            onChange={(e) => setSelectedFile(e.target.value)}
+          >
+            <option value="">-- Chọn File --</option>
+            {files.map((f) => (
+              <option key={f} value={f}>
+                {f}
+              </option>
+            ))}
+          </select>
 
-        <input
-          type="number"
-          className="border rounded p-2 w-24"
-          min={1}
-          max={50}
-          value={chunkSize}
-          onChange={(e) => setChunkSize(parseInt(e.target.value) || 1)}
-          title="Số dòng mỗi lần review"
-        />
-      </div>
-
-      <button
-        onClick={saveReviewed}
-        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-      >
-        Lưu
-      </button>
-
-      {/* Review Section */}
-      {selectedFile && (
-        <div>
-          <div className="grid grid-cols-2 font-semibold mb-2 gap-6">
-            <div className="font-bold text-xl">Origin</div>
-            <div className="font-bold text-xl">Enhanced</div>
-          </div>
-
-          <div className="space-y-2">
-            {pairs.map((pair, i) => {
-              if (pastReview.includes(i)) return null; // ẩn dòng đã review
-              return (
-                <div
-                  key={i}
-                  className={`flex items-center gap-2 transition-all duration-300 ${
-                    removing.has(i)
-                      ? "opacity-0 max-h-0 p-0"
-                      : "opacity-100 max-h-40 p-2"
-                  }`}
-                >
-                  {/* Nút X */}
-                  <button
-                    onClick={() => removeLine(i)}
-                    className="bg-red-500 text-white rounded w-8 py-1 hover:bg-red-600 shadow cursor-pointer transition-colors duration-300"
-                    title="Xóa dòng này"
-                  >
-                    ✖
-                  </button>
-
-                  {/* Textareas */}
-                  <div className="flex-1 grid grid-cols-2 gap-6">
-                    <textarea
-                      className={`border rounded px-2 py-3 w-full transition-colors duration-300 ${
-                        pair.reviewed
-                          ? "bg-green-100 border-green-300"
-                          : "bg-white border-gray-300"
-                      }`}
-                      value={pair.raw}
-                      onChange={(e) => {
-                        const updated = [...pairs];
-                        updated[i].raw = e.target.value;
-                        setPairs(updated);
-                      }}
-                      disabled={pair.reviewed}
-                    />
-                    <textarea
-                      className={`border rounded px-2 py-3 w-full transition-colors duration-300 ${
-                        pair.reviewed
-                          ? "bg-green-100 border-green-300"
-                          : "bg-white border-gray-300"
-                      }`}
-                      value={pair.enhanced}
-                      onChange={(e) => {
-                        const updated = [...pairs];
-                        updated[i].enhanced = e.target.value;
-                        setPairs(updated);
-                      }}
-                      disabled={pair.reviewed}
-                    />
-                  </div>
-
-                  {/* Nút ✓ */}
-                  <button
-                    onClick={() => markReviewed(i)}
-                    className={`w-8 py-1 rounded text-white shadow cursor-pointer transition-colors duration-300 ${
-                      pair.reviewed
-                        ? "bg-green-600 hover:bg-green-700"
-                        : "bg-gray-400 hover:bg-gray-500"
-                    }`}
-                    title="Đánh dấu đã duyệt"
-                  >
-                    ✓
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+          <input
+            type="number"
+            className="border rounded p-2 w-24"
+            min={1}
+            max={50}
+            value={chunkSize}
+            onChange={(e) => setChunkSize(parseInt(e.target.value) || 1)}
+            title="Số dòng mỗi lần review"
+          />
         </div>
-      )}
+
+        <button
+          onClick={saveReviewed}
+          className="bg-green-600 text-white px-4 py-2 my-6 rounded hover:bg-green-700"
+        >
+          Lưu training dataset
+        </button>
+
+        {/* Review Section */}
+        {selectedFile && (
+          <div>
+            <div className="grid grid-cols-2 font-semibold mb-2 gap-6">
+              <div className="font-bold text-2xl ml-12">Bản dịch máy</div>
+              <div className="font-bold text-2xl">Bản cải thiện</div>
+            </div>
+
+            <div className="space-y-2">
+              {pairs.map((pair, i) => {
+                if (pastReview.includes(i)) return null; // ẩn dòng đã review
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-center gap-2 transition-all duration-300 ${
+                      removing.has(i)
+                        ? "opacity-0 max-h-0 p-0"
+                        : "opacity-100 max-h-40 p-2"
+                    }`}
+                  >
+                    {/* Nút X */}
+                    <button
+                      onClick={() => removeLine(i)}
+                      className="bg-red-500 text-white rounded w-8 py-1 hover:bg-red-600 shadow cursor-pointer transition-colors duration-300"
+                      title="Xóa dòng này"
+                    >
+                      ✖
+                    </button>
+
+                    {/* Textareas */}
+                    <div className="flex-1 grid grid-cols-2 gap-6">
+                      <textarea
+                        className={`border rounded px-2 py-3 w-full transition-colors duration-300 text-lg ${
+                          pair.reviewed
+                            ? "bg-green-100 border-green-300 text-black"
+                            : "bg-gray-800 border-gray-300"
+                        }`}
+                        rows={3}
+                        value={pair.raw}
+                        onChange={(e) => {
+                          const updated = [...pairs];
+                          updated[i].raw = e.target.value;
+                          setPairs(updated);
+                        }}
+                        disabled={pair.reviewed}
+                      />
+                      <textarea
+                        className={`border rounded px-2 py-3 w-full transition-colors duration-300 text-lg ${
+                          pair.reviewed
+                            ? "bg-green-100 border-green-300 text-black"
+                            : "bg-gray-800 border-gray-300"
+                        }`}
+                        value={pair.enhanced}
+                        onChange={(e) => {
+                          const updated = [...pairs];
+                          updated[i].enhanced = e.target.value;
+                          setPairs(updated);
+                        }}
+                        disabled={pair.reviewed}
+                      />
+                    </div>
+
+                    {/* Nút ✓ */}
+                    <button
+                      onClick={() => markReviewed(i)}
+                      className={`w-8 py-1 rounded text-white shadow cursor-pointer transition-colors duration-300 ${
+                        pair.reviewed
+                          ? "bg-green-600 hover:bg-green-700"
+                          : "bg-gray-400 hover:bg-gray-500"
+                      }`}
+                      title="Đánh dấu đã duyệt"
+                    >
+                      ✓
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
